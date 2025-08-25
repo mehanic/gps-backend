@@ -24,14 +24,11 @@ gps=>
 
 Проверка REST API
 
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
  └> $ curl http://127.0.0.1:8080/api/info
 {"message": "GPS backend is running"}
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
  └> $ curl http://127.0.0.1:8080/health
 {"status":"ok"}
 
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
  └> $ curl http://127.0.0.1:8080/api/tracks
 null
 
@@ -55,14 +52,11 @@ mosquitto_pub -h localhost -t "gps/device123/track" -m '{"device_id":"device123"
 
 
 
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
  └> $ mosquitto_pub -h localhost -t "gps/device123/track" -m '{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"}'
 
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
  └> $ mosquitto_pub -h localhost -t "gps/device123/track" -m '{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":61,"timestamp":"2025-08-24T18:29:00Z"}'
 
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
- └> $ 
+
 
 
  mosquitto_sub -h localhost -t "gps/+/track" -v
@@ -119,7 +113,6 @@ gps/device123/track {
 
 
 
-┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
  └> $ psql -U gps_user -h localhost -d gps
 Password for user gps_user: 
 psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
