@@ -1,0 +1,226 @@
+
+export DATABASE_URL="postgres://gps_user:gps_pass@localhost:5432/gps?sslmode=disable"
+go run ./cmd/server
+
+
+postgres=# CREATE USER gps_user WITH PASSWORD 'gps_pass';
+CREATE ROLE
+postgres=# CREATE DATABASE gps OWNER gps_user;
+CREATE DATABASE
+postgres=# GRANT ALL PRIVILEGES ON DATABASE gps TO gps_user;
+GRANT
+postgres=# exit
+
+ └> $ psql -U gps_user -h localhost -d gps
+Password for user gps_user:
+psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off)
+Type "help" for help.
+
+gps=>
+
+
+
+
+Проверка REST API
+
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ curl http://127.0.0.1:8080/api/info
+{"message": "GPS backend is running"}
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ curl http://127.0.0.1:8080/health
+{"status":"ok"}
+
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ curl http://127.0.0.1:8080/api/tracks
+null
+
+
+
+
+Проверка MQTT
+В другом терминале подпишись на топик:
+
+mosquitto_sub -h localhost -t "gps/+/track" -v
+
+
+И отправь тестовое сообщение (пример JSON трека):
+
+mosquitto_pub -h localhost -t "gps/device123/track" -m '{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"}'
+
+
+Сервер должен в логах показать: Track saved: {...}
+
+При запросе /api/tracks появится новый трек.
+
+
+
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ mosquitto_pub -h localhost -t "gps/device123/track" -m '{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"}'
+
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ mosquitto_pub -h localhost -t "gps/device123/track" -m '{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":61,"timestamp":"2025-08-24T18:29:00Z"}'
+
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ 
+
+
+ mosquitto_sub -h localhost -t "gps/+/track" -v
+gps/device123/track {"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"}
+gps/device123/track {"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":61,"timestamp":"2025-08-24T18:29:00Z"}
+
+
+go run ./cmd/server
+2025/08/24 18:29:06 Config loaded: &{ServerPort:8080 DBUrl:postgres://gps_user:gps_pass@localhost:5432/gps?sslmode=disable MQTTBroker:tcp://localhost:1883}
+2025/08/24 18:29:06 MQTT connected
+2025/08/24 18:29:06 Server starting on port 8080...
+2025/08/24 18:31:35 Received track: {DeviceID:device123 Latitude:50.45 Longitude:30.52 Speed:60 Timestamp:2025-08-24 18:29:00 +0000 UTC}
+2025/08/24 18:31:35 Track saved: {device123 50.45 30.52 60 2025-08-24 18:29:00 +0000 UTC}
+2025/08/24 18:31:48 Received track: {DeviceID:device123 Latitude:50.45 Longitude:30.52 Speed:61 Timestamp:2025-08-24 18:29:00 +0000 UTC}
+2025/08/24 18:31:48 Track saved: {device123 50.45 30.52 61 2025-08-24 18:29:00 +0000 UTC}
+
+
+
+curl http://127.0.0.1:8080/api/tracks
+[{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"},{"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":61,"timestamp":"2025-08-24T18:29:00Z"}]
+
+
+mosquitto_sub -h localhost -t "gps/+/track" -v
+gps/device123/track {"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"}
+gps/device123/track {"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":61,"timestamp":"2025-08-24T18:29:00Z"}
+gps/device123/track {
+  "device_id": "device123",
+  "latitude": 50.4501,
+  "longitude": 30.5234,
+  "speed": 65.5,
+  "timestamp": "2025-08-24T18:35:00Z"
+}
+
+--------------
+mosquitto_pub -h localhost -t "gps/device123/track" -m '{
+  "device_id": "device123",
+  "latitude": 50.4501,
+  "longitude": 30.5234,
+  "speed": 65.5,
+  "timestamp": "2025-08-24T18:35:00Z"
+}'
+
+-----------------
+mosquitto_sub -h localhost -t "gps/+/track" -v
+gps/device123/track {"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":60,"timestamp":"2025-08-24T18:29:00Z"}
+gps/device123/track {"device_id":"device123","latitude":50.45,"longitude":30.52,"speed":61,"timestamp":"2025-08-24T18:29:00Z"}
+gps/device123/track {
+  "device_id": "device123",
+  "latitude": 50.4501,
+  "longitude": 30.5234,
+  "speed": 65.5,
+  "timestamp": "2025-08-24T18:35:00Z"
+}
+
+
+
+┌────(mehanic (79.254.24.233) [No SSH] [No VPN] [🔹 no_active_playbook] [ansible_core:2.18.8] )────(~)
+ └> $ psql -U gps_user -h localhost -d gps
+Password for user gps_user: 
+psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, compression: off)
+Type "help" for help.
+
+gps=> \d tracks;   -- посмотреть структуру таблицы
+                                        Table "public.tracks"
+  Column   |            Type             | Collation | Nullable |              Default               
+-----------+-----------------------------+-----------+----------+------------------------------------
+ id        | integer                     |           | not null | nextval('tracks_id_seq'::regclass)
+ device_id | text                        |           | not null | 
+ latitude  | double precision            |           | not null | 
+ longitude | double precision            |           | not null | 
+ speed     | double precision            |           | not null | 
+ timestamp | timestamp without time zone |           | not null | 
+Indexes:
+    "tracks_pkey" PRIMARY KEY, btree (id)
+
+\d: extra argument "--" ignored
+\d: extra argument "посмотреть" ignored
+\d: extra argument "структуру" ignored
+\d: extra argument "таблицы" ignored
+gps=> \d tracks;
+                                        Table "public.tracks"
+  Column   |            Type             | Collation | Nullable |              Default               
+-----------+-----------------------------+-----------+----------+------------------------------------
+ id        | integer                     |           | not null | nextval('tracks_id_seq'::regclass)
+ device_id | text                        |           | not null | 
+ latitude  | double precision            |           | not null | 
+ longitude | double precision            |           | not null | 
+ speed     | double precision            |           | not null | 
+ timestamp | timestamp without time zone |           | not null | 
+Indexes:
+    "tracks_pkey" PRIMARY KEY, btree (id)
+
+gps=> SELECT * FROM tracks ORDER BY timestamp DESC LIMIT 5;
+ id | device_id | latitude | longitude | speed |      timestamp      
+----+-----------+----------+-----------+-------+---------------------
+  3 | device123 |  50.4501 |   30.5234 |  65.5 | 2025-08-24 18:35:00
+  1 | device123 |    50.45 |     30.52 |    60 | 2025-08-24 18:29:00
+  2 | device123 |    50.45 |     30.52 |    61 | 2025-08-24 18:29:00
+(3 rows)
+
+gps=> 
+
+
+gps=> SELECT * FROM tracks ORDER BY timestamp DESC LIMIT 5;
+ id | device_id | latitude | longitude | speed |      timestamp      
+----+-----------+----------+-----------+-------+---------------------
+  3 | device123 |  50.4501 |   30.5234 |  65.5 | 2025-08-24 18:35:00
+  1 | device123 |    50.45 |     30.52 |    60 | 2025-08-24 18:29:00
+  2 | device123 |    50.45 |     30.52 |    61 | 2025-08-24 18:29:00
+(3 rows)
+
+gps=> SELECT * FROM tracks WHERE device_id = 'device123' ORDER BY timestamp DESC LIMIT 5;
+ id | device_id | latitude | longitude | speed |      timestamp      
+----+-----------+----------+-----------+-------+---------------------
+  3 | device123 |  50.4501 |   30.5234 |  65.5 | 2025-08-24 18:35:00
+  1 | device123 |    50.45 |     30.52 |    60 | 2025-08-24 18:29:00
+  2 | device123 |    50.45 |     30.52 |    61 | 2025-08-24 18:29:00
+(3 rows)
+
+gps=> 
+
+
+gps=> SELECT * FROM tracks ORDER BY id DESC;
+ id | device_id | latitude | longitude | speed |      timestamp      
+----+-----------+----------+-----------+-------+---------------------
+  3 | device123 |  50.4501 |   30.5234 |  65.5 | 2025-08-24 18:35:00
+  2 | device123 |    50.45 |     30.52 |    61 | 2025-08-24 18:29:00
+  1 | device123 |    50.45 |     30.52 |    60 | 2025-08-24 18:29:00
+(3 rows)
+
+gps=> 
+
+
+gps=> \d tracks;
+                                        Table "public.tracks"
+   Column   |            Type             | Collation | Nullable |              Default               
+------------+-----------------------------+-----------+----------+------------------------------------
+ id         | integer                     |           | not null | nextval('tracks_id_seq'::regclass)
+ device_id  | text                        |           | not null | 
+ latitude   | double precision            |           | not null | 
+ longitude  | double precision            |           | not null | 
+ speed      | double precision            |           | not null | 
+ timestamp  | timestamp without time zone |           | not null | 
+ altitude   | double precision            |           |          | 0
+ heading    | double precision            |           |          | 0
+ satellites | integer                     |           |          | 0
+ accuracy   | double precision            |           |          | 0
+Indexes:
+    "tracks_pkey" PRIMARY KEY, btree (id)
+
+
+---
+
+mosquitto_pub -h localhost -t "gps/device123/track" -m '{
+  "device_id": "device123",
+  "latitude": 50.4501,
+  "longitude": 30.5234,
+  "speed": 65.5,
+  "timestamp": "2025-08-24T18:35:00Z"
+}'
